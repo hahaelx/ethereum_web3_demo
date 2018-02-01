@@ -21,7 +21,7 @@ $ truffle migrate --reset --compile-all
 $ cd app
 
 # install dependencies
-$ npm install # Or yarn install
+$ npm install
 
 # serve with hot reload at localhost:3000
 $ npm run dev
