@@ -16,36 +16,37 @@ v-container
         v-card-title.headline Your Wallet
         v-card-text
           p Addr: {{userInfo.addr}}
-          p ETH: {{userInfo.eth}}
+          p ETH: {{userInfo.ethBalance}}
+          p DemoCoin: {{userInfo.tokenBalance}}
           v-card-actions
             v-text-field(label="Send Eth buy DemoCoin"
                   v-model="amounts"
                   prefix="$")
-            v-btn(color="primary" @click.native="transferToContract(userInfo.addr, amounts)") submit
+            v-btn(color="primary" @click.native="buyTcoin(userInfo.addr, amounts)") submit
 </template>
 <script>
 import moment from 'moment'
 var Web3 = require('web3')
-var clientWeb3
+var web3
 
 // init client web3 js
 if (process.browser) {
   console.log('givenProvider=')
   console.log(Web3.givenProvider)
-  clientWeb3 = new Web3(Web3.givenProvider || 'http://localhost:8545')
+  // web3 = new Web3(Web3.givenProvider || 'http://localhost:8545')
+  web3 = new Web3('http://localhost:8545')
 }
 // int server web3
-var web3 = new Web3('http://localhost:8545')
 export default {
   name: 'Wallet',
   data () {
     return {
       owner: {
-        icoAddr: '0xdc5f9168d5997feccce1019c02f5bebe4a06b2bf',
-        demoCoinAddr: '0x554653a183bdcce6bc4f8609be9d9f4f47267471',
-        addr: '0xc658923308e2e38fc36ac02036a480fa864ff806',
-        eth: 0,
-        demoCoinBalance: 0
+        icoAddr: '0x3bca9e0953e98df09c3f41054e2a5260c80b5646',
+        tokenAddr: '',
+        addr: '0xaa59c363dc4489e00f16a7db85aa0b5408cbd27a',
+        ethBalance: 0,
+        tokenBalance: 0
       },
       icoInfo: {
         totalSupply: 0,
@@ -56,9 +57,9 @@ export default {
         weiRaised: 0
       },
       userInfo: {
-        walletAddr: '',
-        eth: 0,
-        demoCoinBalance: 0
+        addr: '',
+        ethBalance: 0,
+        tokenBalance: 0
       },
       icoContract: {},
       tokenContract: {},
@@ -70,45 +71,78 @@ export default {
   },
   mounted: function () {
     console.log('== mounted ==')
-    this.initWeb3()
-    this.initOwner()
-    this.initICOContract()
-    this.test()
+    this.initContract()
+
+    // this.initOwner()
+    // this.initICOContract()
+    // this.test()
   },
   methods: {
     test: function () {
     },
-    initWeb3: function () {
-      console.log('== initWeb3 ==')
-      const self = this
+    initContract: function () {
+      console.log('== init Contract ==')
+
       var icoArtifact = require('../../build/contracts/DemoCoinCrowdsale.json')
+      // init contract instance
       this.icoContract = new web3.eth.Contract(icoArtifact.abi, this.owner.icoAddr)
-      var demoCoinArtifact = require('../../build/contracts/DemoCoin.json')
-      this.tokenContract = new web3.eth.Contract(demoCoinArtifact.abi, this.owner.demoCoinAddr)
-      clientWeb3.eth.getAccounts().then((result) => {
-        self.userInfo.addr = result[0]
-        self.initUserInfo()
+      console.log(this.icoContract)
+      // add event watch
+      this.icoContract.events.Message('MyEvent', {}, function (error, event) {
+        console.log('== Message ==')
+        if (error) {
+          console.error(error)
+        }
+        console.log(event)
+      })
+      this.getTokenAddress()
+    },
+    getTokenAddress: function () {
+      // get token address
+      const self = this
+      console.log('== getTokenAddress ==')
+      this.icoContract.methods.token()
+        .call({from: this.owner.addr}, function (error, result) {
+          if (error) {
+            console.log('icoContract token:')
+            console.error(error)
+            return
+          }
+          self.owner.tokenAddr = result
+          console.log('this.owner.tokenAddr:' + result)
+          var demoCoinArtifact = require('../../build/contracts/DemoCoin.json')
+          self.tokenContract = new web3.eth.Contract(demoCoinArtifact.abi, self.owner.tokenAddr)
+          self.getUserAddress()
+        }).catch(console.log)
+    },
+    getUserAddress: function () {
+      // get user wallet address
+      console.log('== getUserAddress ==')
+      const self = this
+      web3.eth.getAccounts().then((result) => {
+        self.userInfo.addr = result[1]
         console.log('userInfo.addr:' + self.userInfo.addr)
+        self.getUserBlance()
+        self.getContractInfo()
       }).catch(console.log)
     },
-    initOwner: function () {
+    getUserBlance: function () {
+      console.log('== getUserBlance ==')
       const self = this
-      web3.eth.getBalance(this.owner.addr).then((result) => {
-        console.log('getBalance:' + result)
-        self.owner.eth = web3.utils.fromWei(result, 'ether')
-        console.log('owner wallet:' + self.owner.eth)
-      })
+      // get user eth balnce
+      web3.eth.getBalance(this.userInfo.addr).then((result) => {
+        console.log('getBalance ETH:' + result)
+        self.userInfo.ethBalance = web3.utils.fromWei(result, 'ether')
+      }).catch(console.log)
+      // get user token blance
+      this.tokenContract.methods.balanceOf(this.userInfo.addr).call({from: this.userInfo.addr})
+        .then((result) => {
+          console.log('token balance:' + result)
+          self.userInfo.tokenBalance = result
+        }).catch(console.log)
     },
-    initUserInfo: function () {
-      console.log('initUserInfo')
-      const self = this
-      clientWeb3.eth.getBalance(this.userInfo.addr).then((result) => {
-        console.log('getBalance:' + this.userInfo.addr)
-        console.log(result)
-        self.userInfo.eth = web3.utils.fromWei(result, 'ether')
-      })
-    },
-    initICOContract: function () {
+    getContractInfo: function () {
+      console.log('== getContractInfo ==')
       console.log(this.icoContract)
       const self = this
       // get Token balance
@@ -121,7 +155,7 @@ export default {
             return
           }
           console.log('owner democoin blance:' + result)
-          self.owner.demoCoinBalance = result
+          self.owner.tokenBalance = result
         })
       // get toke totalSupply
       this.tokenContract.methods.totalSupply()
@@ -175,21 +209,42 @@ export default {
           self.owner.weiRaised = result
         })
     },
-    /**
-     * transfer token
-     * @param  {[String]} address [to address]
-     * @param  {[number]} amounts   [transfer amounts]
-     */
-    transferToContract: function (address, amounts) {
-      console.log('makeTransfer')
-      console.log(this.icoContract)
-      // const self = this
-      this.icoContract.methods.buyTokens(address, amounts).send({from: this.add0})
+    buyTcoin: function (address, amounts) {
+      console.log('==buy Yoken==')
+      console.log(address)
+      var ethWei = web3.utils.toWei(amounts, 'ether')
+      // var param = {
+      //   from: address,
+      //   to: this.owner.icoAddr,
+      //   value: ethWei
+      // }
+      // console.log(param)
+      // web3.eth.sendTransaction(param).then((receipt) => {
+      //   console.log('receipt')
+      //   console.log(receipt)
+      // }).catch((err) => {
+      //   console.error(err.message)
+      // })
+      this.icoContract.methods.buyTokens(address).send({from: address, value: ethWei})
         .then((result) => {
           alert('Transfer Successful!')
+          self.getBalance()
         }).catch((err) => {
           console.log(err.message)
         })
+    },
+    send: function (address, amounts) {
+      web3.eth.sendTransaction({
+        from: address,
+        to: this.owner.icoAddr,
+        value: web3.utils.toWei(amounts, 'ether')
+      }, function (error, result) {
+        if (!error) {
+          console.log('success')
+        } else {
+          console.error(error)
+        }
+      })
     }
   }
 }

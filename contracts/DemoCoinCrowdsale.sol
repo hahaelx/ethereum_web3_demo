@@ -1,49 +1,135 @@
 pragma solidity ^0.4.18;
 
-import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
-import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
+import 'zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol';
+import 'zeppelin-solidity/contracts/crowdsale/RefundableCrowdsale.sol';
 import "./DemoCoin.sol";
 
-contract DemoCoinCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
+contract DemoCoinCrowdsale is CappedCrowdsale, RefundableCrowdsale {
 
-  function DemoCoinCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, address _wallet) public
-    CappedCrowdsale(_cap)
-    Crowdsale(_startTime, _endTime, _rate, _wallet)
-  {
+  // ICO Stage
+  // ============
+  enum CrowdsaleStage { PreICO, ICO }
+  CrowdsaleStage public stage = CrowdsaleStage.PreICO; // By default it's Pre Sale
+  // =============
+
+  // Token Distribution
+  // =============================
+  uint256 public maxTokens = 100000000000000000000; // There will be total 100 Hashnode Tokens
+  uint256 public tokensForEcosystem = 20000000000000000000;
+  uint256 public tokensForTeam = 10000000000000000000;
+  uint256 public tokensForBounty = 10000000000000000000;
+  uint256 public totalTokensForSale = 60000000000000000000; // 60 DOC will be sold in Crowdsale
+  uint256 public totalTokensForSaleDuringPreICO = 20000000000000000000; // 20 out of 60 DOC will be sold during PreICO
+  // ==============================
+
+  // Amount raised in PreICO
+  // ==================
+  uint256 public totalWeiRaisedDuringPreICO;
+  // ===================
+
+
+  // Events
+  event EthTransferred(string text);
+  event EthRefunded(string text);
+  event Message(string text, uint256 value);
+
+  // Constructor
+  // ============
+  function DemoCoinCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, address _wallet, uint256 _goal, uint256 _cap) CappedCrowdsale(_cap) FinalizableCrowdsale() RefundableCrowdsale(_goal) Crowdsale(_startTime, _endTime, _rate, _wallet) public {
+      require(_goal <= _cap);
   }
+  // =============
 
-  // Create a custom token to mint instead of the default MintableToken
+  // Token Deployment
+  // =================
   function createTokenContract() internal returns (MintableToken) {
-    return new DemoCoin();
+    return new DemoCoin(); // Deploys the ERC20 token. Automatically called when crowdsale contract is deployed
+  }
+  // ==================
+
+  // Crowdsale Stage Management
+  // =========================================================
+
+  // Change Crowdsale Stage. Available Options: PreICO, ICO
+  function setCrowdsaleStage(uint value) public onlyOwner {
+
+      CrowdsaleStage _stage;
+
+      if (uint(CrowdsaleStage.PreICO) == value) {
+        _stage = CrowdsaleStage.PreICO;
+      } else if (uint(CrowdsaleStage.ICO) == value) {
+        _stage = CrowdsaleStage.ICO;
+      }
+
+      stage = _stage;
+
+      if (stage == CrowdsaleStage.PreICO) {
+        setCurrentRate(5);
+      } else if (stage == CrowdsaleStage.ICO) {
+        setCurrentRate(2);
+      }
   }
 
-  // Override to indicate when the crowdsale ends and does not accept any more contributions
-  // Checks endTime by default, plus cap from CappedCrowdsale
-  function hasEnded() public view returns (bool) {
-    return super.hasEnded();
+  // Change the current rate
+  function setCurrentRate(uint256 _rate) private {
+      rate = _rate;
   }
 
-  // Override this method to have a way to add business logic to your crowdsale when buying
-  // Returns weiAmount times rate by default
-  function getTokenAmount(uint256 weiAmount) internal view returns(uint256) {
-    return super.getTokenAmount(weiAmount);
+  // ================ Stage Management Over =====================
+
+  // Token Purchase
+  // =========================
+  function () external payable {
+      Message("payable", msg.value);
+      uint256 tokensThatWillBeMintedAfterPurchase = msg.value.mul(rate);
+      if ((stage == CrowdsaleStage.PreICO) && (token.totalSupply() + tokensThatWillBeMintedAfterPurchase > totalTokensForSaleDuringPreICO)) {
+        msg.sender.transfer(msg.value); // Refund them
+        EthRefunded("PreICO Limit Hit");
+        return;
+      }
+
+      buyTokens(msg.sender);
+
+      if (stage == CrowdsaleStage.PreICO) {
+          totalWeiRaisedDuringPreICO = totalWeiRaisedDuringPreICO.add(msg.value);
+      }
   }
 
-  // Override to create custom fund forwarding mechanisms
-  // Forwards funds to the specified wallet by default
   function forwardFunds() internal {
-    return super.forwardFunds();
+      if (stage == CrowdsaleStage.PreICO) {
+          wallet.transfer(msg.value);
+          EthTransferred("forwarding funds to wallet");
+      } else if (stage == CrowdsaleStage.ICO) {
+          EthTransferred("forwarding funds to refundable vault");
+          super.forwardFunds();
+      }
   }
+  // ===========================
 
-  // Criteria for accepting a purchase
-  // Make sure to call super.validPurchase(), or all the criteria from parents will be overwritten
-  function validPurchase() internal view returns (bool) {
-    return super.validPurchase();
+  // Finish: Mint Extra Tokens as needed before finalizing the Crowdsale.
+  // ====================================================================
+
+  function finish(address _teamFund, address _ecosystemFund, address _bountyFund) public onlyOwner {
+
+      require(!isFinalized);
+      uint256 alreadyMinted = token.totalSupply();
+      require(alreadyMinted < maxTokens);
+
+      uint256 unsoldTokens = totalTokensForSale - alreadyMinted;
+      if (unsoldTokens > 0) {
+        tokensForEcosystem = tokensForEcosystem + unsoldTokens;
+      }
+
+      token.mint(_teamFund,tokensForTeam);
+      token.mint(_ecosystemFund,tokensForEcosystem);
+      token.mint(_bountyFund,tokensForBounty);
+      finalize();
   }
+  // ===============================
 
-  // Override to execute any logic once the crowdsale finalizes
-  // Requires a call to the public finalize method, only after the sale hasEnded
-  function finalization() internal {
-    return super.finalization();
+  // REMOVE THIS FUNCTION ONCE YOU ARE READY FOR PRODUCTION
+  // USEFUL FOR TESTING `finish()` FUNCTION
+  function hasEnded() public view returns (bool) {
+    return true;
   }
 }

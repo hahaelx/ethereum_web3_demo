@@ -1,15 +1,14 @@
-const DemoCoin= artifacts.require("./DemoCoin.sol")
 const DemoCoinCrowdsale = artifacts.require("./DemoCoinCrowdsale.sol")
 module.exports = function(deployer, network, accounts) {
-
-  deployer.deploy(DemoCoin)
-  const capped = 10000
-  const startTime = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 1 // one second in the future
-  const endTime = startTime + (86400 * 20) // 20 days
-  const rate = new web3.BigNumber(1000)
-  const wallet = accounts[0]
-  deployer.deploy(DemoCoinCrowdsale, startTime, endTime, rate, capped, wallet).then(function(result){
-    console.log('DemoCoinCrowdsale deploy')
-    console.log(result);
-  })
+  const startTime = Math.round((new Date(Date.now()).getTime())/1000); // now
+  const endTime =  startTime + (86400 * 20) ; // Today + 20 days
+  const rate = 1000 // rate ETH to DemoCoin
+  deployer.deploy(DemoCoinCrowdsale,
+    startTime,
+    endTime,
+    rate,
+    "0x640c0a99376f1c40ca8474696d8230563674b7f1", // founds wallet
+    2000000000000000000, // 2 ETH
+    500000000000000000000 // 500 ETH
+  );
 };
