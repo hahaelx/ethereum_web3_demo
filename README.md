@@ -33,3 +33,4 @@ $ npm start
 # generate static project
 $ npm run generate
 ```
+# Install Nodejs for Ubuntu

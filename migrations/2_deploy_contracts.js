@@ -7,8 +7,6 @@ module.exports = function(deployer, network, accounts) {
     startTime,
     endTime,
     rate,
-    "0x640c0a99376f1c40ca8474696d8230563674b7f1", // founds wallet
-    2000000000000000000, // 2 ETH
-    500000000000000000000 // 500 ETH
+    "0x640c0a99376f1c40ca8474696d8230563674b7f1" // founds wallet
   );
 };
