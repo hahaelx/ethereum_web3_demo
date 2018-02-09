@@ -73,8 +73,7 @@
         fixed: false,
         items: [
           { icon: 'apps', title: 'Welcome', to: '/' },
-          { icon: 'bubble_chart', title: 'Demo', to: '/demoindex' },
-          { icon: 'bubble_chart', title: 'EthJs demo', to: '/ethjsdemo' }
+          { icon: 'bubble_chart', title: 'Demo', to: '/demoindex' }
         ],
         miniVariant: false,
         right: true,

@@ -1,7 +1,6 @@
 pragma solidity ^0.4.18;
 
-import 'zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol';
-import 'zeppelin-solidity/contracts/crowdsale/RefundableCrowdsale.sol';
+import 'zeppelin-solidity/contracts/crowdsale/Crowdsale.sol';
 import "./DemoCoin.sol";
 
 contract DemoCoinCrowdsale is Crowdsale {

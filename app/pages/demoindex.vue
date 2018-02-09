@@ -5,7 +5,7 @@ v-container
       v-card
         v-card-title.headline Demo Coin ICO Information
         v-card-text
-          p Ico Contract Addr: {{this.owner.addr}}
+          p Ico Contract Addr: {{this.owner.icoAddr}}
           p Token Addr: {{this.owner.tokenAddr}}
           p Token Total Supply: {{this.icoInfo.totalSupply}}
           p Start Time: {{this.icoInfo.startTime}}
@@ -63,9 +63,9 @@ export default {
   data () {
     return {
       owner: {
-        icoAddr: '0x27e7ac5dcc61ba98cb08b8d1482f1ebdb0877aa1',
+        icoAddr: '0x7f8e6d8ce74b46ec8d2237c41e454a210cdabc33',
         tokenAddr: '',
-        addr: '0xaa59c363dc4489e00f16a7db85aa0b5408cbd27a',
+        addr: '0x7f4c0aaa1f3be620694d04bd49c7dda881dd5936',
         ethBalance: 0,
         tokenBalance: 0
       },
@@ -113,7 +113,7 @@ export default {
       this.icoContract = new web3.eth.Contract(icoArtifact.abi, this.owner.icoAddr)
       console.log(this.icoContract)
       // add event watch
-      // this.icoContract.events.Message('MyEvent', {}, function (error, event) {
+      // this.icoContract.events.TokenPurchase({}, {fromBlock: 0, toBlock: 'latest'}, function (error, event) {
       //   console.log('== Message ==')
       //   if (error) {
       //     console.error(error)
@@ -126,6 +126,8 @@ export default {
       // get token address
       const self = this
       console.log('== getTokenAddress ==')
+      console.log('owner addr' + this.owner.addr)
+      console.log('icoAddr: ' + this.owner.icoAddr)
       this.icoContract.methods.token()
         .call({from: this.owner.addr}, function (error, result) {
           if (error) {
